@@ -1,1 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Secure Document Portal</title>
+    <style>
+        :root {
+            --primary: #4285f4;
+            --primary-dark: #3367d6;
+            --bg-gradient: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #1a1a2e);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text: #ffffff;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            /* Security: Disable Text Selection */
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-gradient);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            color: var(--text);
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Header UI */
+        header {
+            padding: 1rem 2rem;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        /* Main Container */
+        main {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Iframe Styling */
+        #viewer-container {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none; /* Hidden until "Open" is clicked */
+            background: #fff;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Splash Card */
+        #splash-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(15px);
+            padding: 2.5rem;
+            border-radius: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            max-width: 90%;
+            width: 400px;
+            z-index: 10;
+        }
+
+        h1 { margin-bottom: 1rem; font-weight: 300; letter-spacing: 1px; }
+        p { margin-bottom: 2rem; opacity: 0.7; font-size: 0.9rem; line-height: 1.5; }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* Controls Overlay */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .fab {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .fab:hover { transform: scale(1.1); }
+
+        /* Loading Spinner */
+        #loader {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Security Overlay - Transparent layer to block long-press on mobile */
+        #security-shield {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5;
+            display: none;
+            pointer-events: none; /* Allows scrolling but blocks context calls if refined */
+        }
+
+        @media (max-width: 600px) {
+            header { padding: 0.8rem 1rem; }
+            #splash-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <header>
+        <div class="logo-area">
+            <div class="status-dot"></div>
+            <span style="font-weight: bold; font-size: 0.8rem; text-transform: uppercase;">Secure Cloud Viewer</span>
+        </div>
+        <div id="header-actions" style="display: none;">
+            <button class="btn btn-secondary" style="padding: 5px 15px; font-size: 0.7rem;" onclick="location.reload()">Reload</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="security-shield"></div>
+
+        <div id="splash-card">
+            <h1>Drive Portal</h1>
+            <p>Accessing shared folder: <b>1m7ik...QmRs</b><br>Authorized browser-only session.</p>
+            
+            <div id="loader"></div>
+            
+            <div id="action-buttons">
+                <button class="btn" onclick="initializeViewer()">
+                    <svg width="20" height="20" fill="white" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                    Open in Browser
+                </button>
+            </div>
+        </div>
+
+        <div id="viewer-container">
+            <iframe 
+                id="drive-frame"
+                src="" 
+                allow="autoplay">
+            </iframe>
+        </div>
+    </main>
+
+    <div class="controls" id="ui-controls" style="display: none;">
+        <div class="fab" onclick="toggleFullScreen()" title="Toggle Fullscreen">
+            <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        </div>
+        <div class="fab" style="background: #db4437;" onclick="exitViewer()" title="Exit">
+            <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </div>
+    </div>
+
+    <script>
+        const FOLDER_ID = '1m7ikCrdk6RMqxaYYfQGDVr8e3TxfQmRs';
+        const BASE_URL = `https://drive.google.com/embeddedfolderview?id=${FOLDER_ID}#grid`;
+        
+        const splashCard = document.getElementById('splash-card');
+        const viewerContainer = document.getElementById('viewer-container');
+        const driveFrame = document.getElementById('drive-frame');
+        const uiControls = document.getElementById('ui-controls');
+        const headerActions = document.getElementById('header-actions');
+        const loader = document.getElementById('loader');
+        const actionBtns = document.getElementById('action-buttons');
+
+        function isAndroid() {
+            return /Android/i.test(navigator.userAgent);
+        }
+
+        function initializeViewer() {
+            actionBtns.style.display = 'none';
+            loader.style.display = 'block';
+
+            // Android Intent Protection:
+            // If Android, we can try to force Chrome to handle the URL specifically 
+            // rather than letting the OS offer the Drive App.
+            if (isAndroid()) {
+                const chromeIntent = `googlechrome://navigate?url=${encodeURIComponent(BASE_URL)}`;
+                
+                // We attempt to open in iframe, but if that fails, we use the intent fallback
+                setTimeout(() => {
+                    renderIframe();
+                }, 500);
+            } else {
+                renderIframe();
+            }
+        }
+
+        function renderIframe() {
+            driveFrame.src = BASE_URL;
+            
+            driveFrame.onload = function() {
+                loader.style.display = 'none';
+                splashCard.style.display = 'none';
+                viewerContainer.style.display = 'block';
+                uiControls.style.display = 'flex';
+                headerActions.style.display = 'block';
+            };
+        }
+
+        function exitViewer() {
+            viewerContainer.style.display = 'none';
+            uiControls.style.display = 'none';
+            headerActions.style.display = 'none';
+            splashCard.style.display = 'block';
+            actionBtns.style.display = 'block';
+            driveFrame.src = "";
+        }
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // --- SECURITY SUITE ---
+
+        // 1. Disable Right Click
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // 2. Disable Keyboard Shortcuts
+        document.onkeydown = function(e) {
+            // Disable F12
+            if(e.keyCode == 123) return false;
+            
+            // Disable Ctrl+Shift+I (Inspect)
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+            
+            // Disable Ctrl+Shift+J (Console)
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+            
+            // Disable Ctrl+U (View Source)
+            if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+            
+            // Disable Ctrl+S (Save)
+            if(e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false;
+        };
+
+        // 3. Prevent Drag and Drop
+        window.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        }, false);
+        window.addEventListener('drop', function(e) {
+            e.preventDefault();
+        }, false);
+
+        // 4. Mobile Long Press Protection
+        window.oncontextmenu = function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            return false;
+        };
+    </script>
+</body>
+</html>
 
